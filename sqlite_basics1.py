@@ -29,22 +29,24 @@ CREATE TABLE student (
     age INT
 )
 """)
+
 cursor.execute("""
-CREATE TABLE registered_courses  (
+CREATE TABLE registered_courses (
+    courses_id INT,
     student_id INT,
-    course_id INT,
-    PRIMARY KEY(student_id, course_id),
-    FOREIGN KEY (student_id) REFERENCES student(student_id)
-               
+PRIMARY KEY (student_id, courses_id),
+FOREIGN KEY (student_id) REFERENCES student(student_id)
 )
 """)
+
 cursor.execute("""
 CREATE TABLE grades (
+    courses_id INT,
     student_id INT,
-    course_id INT,
-    grade REAL,
-    PRIMARY KEY(student_id, course_id),
-    FOREIGN KEY (student_id) REFERENCES student(student_id)
+    received_grade INT,
+    PRIMARY KEY (student_id, courses_id, received_grade),
+    FOREIGN KEY (student_id, courses_id) REFERENCES registered_courses(student_id, courses_id)            
+                         
 )
 """)
 
@@ -53,56 +55,69 @@ students = [
     (2, 'Bob', 22),
     (3, 'Charlie', 21)
 ]
-courses = [
-    (1,370),
-    (2,670),
-    (3,390)
+
+
+registered_courses = [
+    (100, 1),
+    (101, 1),
+    (101, 2),
+    (102, 2),
+    (102, 3),
+    (100, 3)
 ]
-grades_data= [
-    (1,370,89.5),
-    (1,490,99),
-    (2,431,57),
-    (2,670,74),
-    (3,390,97)
+
+grades = [
+    (100, 1, 50),
+    (101, 1, 60),
+    (101, 2, 80),
+    (102, 2, 99),
+    (102, 3, 100),
+    (100, 3, 45)
 ]
 
 cursor.executemany("INSERT INTO student VALUES (?, ?, ?)", students)
-cursor.executemany("INSERT INTO registered_courses VALUES (?, ?)",courses)
-cursor.executemany("INSERT INTO grades VALUES (?, ?, ?)", grades_data)
+cursor.executemany("INSERT INTO registered_courses VALUES (?, ?)", registered_courses)
+cursor.executemany("INSERT INTO grades VALUES (?, ?, ?)", grades)
 
 conn.commit()
 
 print_table(cursor, "student")
+print_table(cursor, "registered_courses")
+print_table(cursor, "grades")
+
+
+
+#find the maximum
+print("Maximum grade per student:")
+cursor.execute("""
+SELECT g.student_id, g.courses_id, g.received_grade AS max_grade FROM grades g
+JOIN (
+    SELECT student_id, MAX(received_grade) AS max_grade
+    FROM grades
+    GROUP BY student_id           ) mg
+ON g.student_id = mg.student_id AND g.received_grade = mg.max_grade;
+"""
+)
+for row in cursor.fetchall():
+    print(row)
+
+
+#find the average
+print("\nAverage grade per student:")
+cursor.execute("""
+SELECT student_id, AVG(received_grade) AS average_grade
+FROM grades              
+GROUP BY student_id
+               """
+)
+for row in cursor.fetchall():
+    print(row)
 
 # Example SELECT query
 cursor.execute("SELECT * FROM student")
 print("\nResult of: SELECT * FROM student")
 for row in cursor.fetchall():
     print(row)
-cursor.execute("""
-SELECT student_id, course_id, grade
-FROM grades g
-WHERE grade = (
-    SELECT MAX(g2.grade)
-    FROM grades g2
-    WHERE g2.student_id = g.student_id
-)
-ORDER BY student_id;
-""")
 
-print("\nMaximum grade per student:")
-for row in cursor.fetchall():
-    print(row)
-
-
-cursor.execute("""
-SELECT student_id, AVG(grade) as average_grade
-FROM grades
-GROUP BY student_id
-""")
-
-print("\nAverage Grade per Student:")
-for row in cursor.fetchall():
-    print(row)
 
 conn.close()
